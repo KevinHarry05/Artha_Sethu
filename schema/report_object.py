@@ -30,5 +30,6 @@ class ReportObject:
     financial_structuring: dict[str, Any] = field(default_factory=dict)  # module 2a output
     feasibility: dict[str, Any] = field(default_factory=dict)       # module 1 output
     repayment_viability: dict[str, Any] = field(default_factory=dict)    # module 2b output
+    dashboard: dict[str, Any] = field(default_factory=dict)          # composite overview, computed from the above
 
     trace: list[TraceStep] = field(default_factory=list)

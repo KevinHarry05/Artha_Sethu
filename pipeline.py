@@ -33,6 +33,42 @@ from schema import ReportObject, TraceStep
 DATA_SNAPSHOT_VERSION = "makeathon_internal_synthetic_v1_200loc"
 
 
+def _compute_dashboard_summary(feasibility: dict, repayment_viability: dict) -> dict:
+    """A deterministic, code-computed composite view for the dashboard's
+    overview tab -- three 0-100 component scores plus a weighted overall
+    read. Not something any of the four engines above produce on their own;
+    this is presentation-layer arithmetic over their already-computed
+    outputs, added to match FronteEnd's dashboard contract (report.dashboard
+    in app/page.tsx). No LLM involved -- same "code computes" rule as
+    everything else in this file."""
+    demand_gap_pct = float(feasibility["demand_gap_pct"])
+    risk_severity_score = float(feasibility["risk"]["risk_severity_score"])
+    repayable_count = repayment_viability["repayable_count"]
+    n_scenarios = repayment_viability["n_scenarios"]
+
+    market_opportunity = max(0.0, min(100.0, demand_gap_pct))
+    risk_safety = max(0.0, min(100.0, 100.0 - risk_severity_score * 10))
+    financial_viability = (repayable_count / n_scenarios * 100.0) if n_scenarios else 0.0
+
+    component_scores = {
+        "market_opportunity": round(market_opportunity),
+        "financial_viability": round(financial_viability),
+        "risk_safety": round(risk_safety),
+    }
+    overall = round(sum(component_scores.values()) / len(component_scores))
+    weakest_key = min(component_scores, key=component_scores.get)
+    note = (
+        f"Driven mainly by {weakest_key.replace('_', ' ')} "
+        f"({component_scores[weakest_key]}/100) -- see the module breakdown below."
+    )
+    return {
+        "overall_readiness_score": overall,
+        "note": note,
+        "component_scores": component_scores,
+        "opportunity_class": feasibility["opportunity_class"],
+    }
+
+
 def run_pipeline(
     location_query: str,
     business_category: str,
@@ -147,7 +183,10 @@ def run_pipeline(
         "verdict": viability.verdict, "repayable_count": viability.repayable_count,
         "n_scenarios": viability.n_scenarios,
         "total_repayment": sum((r.installment_amount for r in repayment_rows), Decimal(0)),
+        "schedule": [asdict(r) for r in schedule],
     }
+
+    report.dashboard = _compute_dashboard_summary(report.feasibility, report.repayment_viability)
 
     report.trace = trace
     return report

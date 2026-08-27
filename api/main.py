@@ -16,15 +16,34 @@ Run locally:
     # open http://127.0.0.1:8000
 """
 
+import os
 from decimal import Decimal
 from pathlib import Path
 
 from fastapi import FastAPI, Form
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 
+from api.auth_routes import router as auth_router
 from pipeline import run_pipeline
 
 app = FastAPI(title="ARTHA SETU")
+
+# CORS -- FronteEnd (Next.js) runs on a different origin (localhost:3000)
+# than this API (localhost:8000); the browser silently discards a
+# cross-origin response without these headers even when the request
+# succeeded server-side. Override with FRONTEND_ORIGINS (comma-separated)
+# if FronteEnd runs somewhere else, e.g. FRONTEND_ORIGINS=http://localhost:3001
+_default_origins = "http://localhost:3000,http://127.0.0.1:3000"
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in os.environ.get("FRONTEND_ORIGINS", _default_origins).split(",") if o.strip()],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth_router)  # POST /auth/signup, POST /auth/login
 
 TEMPLATE_PATH = Path(__file__).parent / "templates" / "index.html"
 
@@ -87,5 +106,6 @@ def assess(
         "financial_structuring": decimal_safe(report.financial_structuring),   # Module 2 (part 1)
         "feasibility": decimal_safe(report.feasibility),                        # Module 1
         "repayment_viability": decimal_safe(report.repayment_viability),        # Module 2 (part 2)
+        "dashboard": decimal_safe(report.dashboard),                             # composite overview
         "trace": trace,
     }
