@@ -1,0 +1,46 @@
+# Scheme parameters — DO NOT hardcode these in module logic.
+# Source: nsfdc.nic.in. Corporation-agnostic architecture: add sibling
+# corporations (NBCFDC, NSKFDC, NHFDC) as additional top-level entries
+# with their own parameters when/if needed — same schema.
+
+nsfdc:
+  corporation_name: "National Scheduled Castes Finance and Development Corporation"
+  target_group: "Scheduled Castes"
+  department: "Ministry of Social Justice and Empowerment"
+  effective_from: "2024-01-01"  # [VERIFY] exact effective date of current terms
+
+  eligibility:
+    community: "SC"
+    max_annual_family_income: 300000   # ₹3 lakh ceiling
+    requires_non_defaulter: true
+
+  schemes:
+    micro_credit_finance:
+      project_cost_min: 0
+      project_cost_max: 140000          # ₹1.40 lakh
+      loan_share_pct: 0.90
+      loan_cap: 125000                  # ₹1.25 lakh — caps override the percentage
+      beneficiary_interest_pct: 6.5
+      nsfdc_to_sca_interest_pct: 2.5
+      repayment_frequency: "quarterly"
+      tenure_months: 36                 # 3 years
+      moratorium_months: 3
+      moratorium_exception_months: null
+
+    term_loan:
+      project_cost_min: 140001
+      project_cost_max: 5000000         # ₹50 lakh
+      loan_share_pct: 0.90
+      loan_cap: 4500000                 # ₹45 lakh
+      beneficiary_interest_pct: 8.0
+      nsfdc_to_sca_interest_pct: 4.0
+      repayment_frequency: "quarterly"
+      tenure_months: 84                 # 7 years
+      moratorium_months: 6
+      moratorium_exception_months: 12   # plantation & construction
+      moratorium_exception_activities: ["plantation", "construction"]
+
+  moratorium_interest_modes: ["CAPITALISED", "SERVICED", "WAIVED"]  # [VERIFY] actual NSFDC practice
+
+  # Above project_cost_max of the highest tier, the scheme ends.
+  # Engines must say so explicitly — never extrapolate a third tier.

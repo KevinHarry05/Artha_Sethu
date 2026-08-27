@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ARTHA SETU Report rpt_8fff0953e853</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; line-height: 1.5; color: #1a1a1a; }
+  h1 { font-size: 1.4rem; }
+  .meta { color: #555; font-size: 0.85rem; margin-bottom: 1.5rem; }
+  pre { white-space: pre-wrap; background: #f7f7f7; padding: 1rem; border-radius: 6px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.8rem; margin-top: 1rem; }
+  th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f0f0f0; }
+</style>
+</head>
+<body>
+  <h1>ARTHA SETU — Feasibility &amp; Financial Structuring Report</h1>
+  <div class="meta">
+    Report ID: rpt_8fff0953e853 &middot;
+    Data snapshot: makeathon_internal_synthetic_v1_200loc &middot;
+    Generated: 2026-08-27T18:29:58.562384+00:00
+  </div>
+  <pre>ARTHA SETU feasibility &amp; financial structuring report (rpt_8fff0953e853)
+Generated 2026-08-27T18:29:58.562384+00:00 against data snapshot &#x27;makeathon_internal_synthetic_v1_200loc&#x27;.
+
+Location: Chengalpattu Locality 05, Chengalpattu Block 2, Chengalpattu (rural).
+
+FINANCIAL STRUCTURING (borrow right, not borrow max):
+  Recommended project cost: Rs.131,000.00 (operational need Rs.131,000.00, affordable ceiling Rs.150,000.00).
+  Scheme: micro_credit_finance | Loan amount: Rs.117,900.00 | Margin required: Rs.13,100.00 | Interest: 6.5% p.a.
+  Naive formula matches the cap-aware affordable figure.
+
+FEASIBILITY:
+  5km catchment population: 13,342 | 10km: 46,715.
+  1 competitor(s) nearby, nearest at 0km. Demand gap 83.33%, classified underserved.
+  Estimated monthly revenue: Rs.22,517.28 [Rs.13,510.37 - Rs.31,524.19].
+  SWOT:
+    [STRENGTH] Established local demand for fresh milk; low competitor density outside urban core. (1 competitor(s) within 0km, demand gap 83.33%.)
+    [WEAKNESS] Revenue drops materially in monsoon months due to lower milk yield. (Category risk severity 4.5/10.)
+    [OPPORTUNITY] Dairy cooperative offtake nearby offers guaranteed procurement and price floor. (Demand gap of 83.33% estimated from 1 local competitor(s).)
+    [THREAT] Regional livestock disease risk with limited veterinary infrastructure. (Nearest competitor at 0km; estimated monthly revenue Rs.22,517.28 [Rs.13,510.37-Rs.31,524.19].)
+    [WEAKNESS] At the Micro Credit Finance tier (project cost capped near Rs.1,40,000; this applicant&#x27;s capex budget is Rs.122,000.00), infrastructure upgrades beyond the baseline dairy setup are constrained by budget, not just by market.
+
+REPAYMENT &amp; VIABILITY:
+  Moratorium mode: SERVICED | Quarterly installment (post-moratorium): Rs.11,791.26.
+  Repayable in 10 of 10 scenarios.</pre>
+  <h2>Calculation trace</h2>
+  <table>
+    <thead><tr><th>Step</th><th>Inputs</th><th>Formula</th><th>Output</th><th>Sources</th></tr></thead>
+    <tbody><tr><td>location_resolver</td><td>{&#x27;query&#x27;: &#x27;loc_CGP_05&#x27;}</td><td>DB lookup (exact/fuzzy)</td><td>loc_CGP_05</td><td>synthetic_illustrative_demo (real district+region, synthetic sub-district)</td></tr><tr><td>pre_screening_gate</td><td>{&#x27;community&#x27;: &#x27;SC&#x27;, &#x27;income&#x27;: &#x27;120000&#x27;, &#x27;is_defaulter&#x27;: False}</td><td>community match AND income &lt; ceiling AND NOT is_defaulter</td><td>True</td><td>config/scheme_config.yaml</td></tr><tr><td>financial_structuring</td><td>{&#x27;margin_available&#x27;: &#x27;15000&#x27;, &#x27;category&#x27;: &#x27;Dairy&#x27;}</td><td>recommended_cost = MIN(affordable_max_project_cost, operational_project_cost); borrow right, not borrow max</td><td>{&#x27;recommended_project_cost&#x27;: &#x27;131000.00&#x27;, &#x27;loan_amount&#x27;: &#x27;117900.00&#x27;}</td><td>config/scheme_config.yaml, 04_business_cost_profiles.csv (NABARD-illustrative)</td></tr><tr><td>feasibility_engine</td><td>{&#x27;location_id&#x27;: &#x27;loc_CGP_05&#x27;, &#x27;category&#x27;: &#x27;Dairy&#x27;}</td><td>demand_gap = 100*(1-c/(c+5)); revenue = units*30*price, +/-40% band</td><td>{&#x27;competitor_count&#x27;: 1, &#x27;demand_gap_pct&#x27;: &#x27;83.33&#x27;}</td><td>09/08_...csv (competitor counts), 05_market_prices.csv</td></tr><tr><td>repayment_viability</td><td>{&#x27;loan_amount&#x27;: &#x27;117900.00&#x27;, &#x27;moratorium_mode&#x27;: &#x27;SERVICED&#x27;}</td><td>quarterly amortisation, declining balance; viability = scenario sampling over revenue/cost bands</td><td>Repayable in 10 of 10 scenarios</td><td>06_seasonality_profile.csv</td></tr></tbody>
+  </table>
+</body>
+</html>

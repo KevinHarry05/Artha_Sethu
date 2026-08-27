@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARTHA SETU</title>
+<style>
+  :root {
+    --bg: #f6f7f5; --card: #ffffff; --border: #dfe3de; --text: #1c231c; --muted: #5b655a;
+    --accent: #2f6b3a; --accent-dark: #234f2b; --warn: #b3541e; --bad: #a53232; --good: #2f6b3a;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text);
+         margin: 0; padding: 2rem 1rem 4rem; }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+  .tagline { color: var(--muted); margin-top: 0; margin-bottom: 1.5rem; font-size: 0.95rem; }
+  form.card, .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+                      padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 0.25rem; margin-top: 0.9rem; }
+  label:first-child { margin-top: 0; }
+  input, select { width: 100%; padding: 0.55rem 0.6rem; border: 1px solid var(--border); border-radius: 6px;
+                  font-size: 0.95rem; background: #fff; color: var(--text); }
+  details { margin-top: 1rem; }
+  summary { cursor: pointer; font-size: 0.85rem; color: var(--accent-dark); font-weight: 600; }
+  button { margin-top: 1.25rem; background: var(--accent); color: #fff; border: none; padding: 0.7rem 1.4rem;
+           border-radius: 6px; font-size: 0.95rem; cursor: pointer; }
+  button:hover { background: var(--accent-dark); }
+  button:disabled { opacity: 0.6; cursor: default; }
+  h2 { font-size: 1.05rem; border-bottom: 2px solid var(--accent); padding-bottom: 0.35rem; margin-top: 0; }
+  h3 { font-size: 0.9rem; color: var(--accent-dark); margin: 1rem 0 0.4rem; }
+  .kv { display: grid; grid-template-columns: minmax(180px, 42%) 1fr; gap: 0.3rem 1rem; font-size: 0.88rem; }
+  .kv div:nth-child(odd) { color: var(--muted); }
+  .swot { list-style: none; padding: 0; margin: 0.3rem 0; font-size: 0.85rem; }
+  .swot li { padding: 0.4rem 0.6rem; border-radius: 6px; margin-bottom: 0.35rem; background: #f1f3f0; }
+  .swot li b { text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.03em; }
+  .badge { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.75rem;
+           font-weight: 600; color: #fff; }
+  .badge.good { background: var(--good); } .badge.warn { background: var(--warn); } .badge.bad { background: var(--bad); }
+  .error { background: #fdeceb; border: 1px solid var(--bad); color: var(--bad); padding: 0.8rem 1rem;
+           border-radius: 8px; font-size: 0.9rem; }
+  .note { color: var(--muted); font-size: 0.8rem; font-style: italic; margin-top: 0.4rem; }
+  #results { display: none; }
+  table.trace { width: 100%; border-collapse: collapse; font-size: 0.78rem; margin-top: 0.5rem; }
+  table.trace th, table.trace td { border: 1px solid var(--border); padding: 5px 7px; text-align: left; vertical-align: top; }
+  table.trace th { background: #f1f3f0; }
+  .loading { color: var(--muted); font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ARTHA SETU</h1>
+  <p class="tagline">Borrow right, not borrow max &mdash; feasibility and financial structuring for rural &amp; semi-urban micro-enterprises.</p>
+
+  <form class="card" id="assessForm">
+    <label for="location">Location (village / locality / city / state &mdash; anywhere in India)</label>
+    <input id="location" name="location" placeholder="e.g. Chengalpattu, Koramangala, Rajasthan..." required>
+
+    <div class="grid">
+      <div>
+        <label for="budget">Budget available (&#8377;)</label>
+        <input id="budget" name="budget" type="number" min="1" step="1" placeholder="e.g. 150000" required>
+      </div>
+      <div>
+        <label for="category">Business category</label>
+        <select id="category" name="category">
+          <option value="Dairy">Dairy</option>
+          <option value="Retail">Retail</option>
+          <option value="Textiles">Textiles</option>
+        </select>
+      </div>
+    </div>
+
+    <details>
+      <summary>Eligibility details (defaults pre-filled)</summary>
+      <div class="grid">
+        <div>
+          <label for="community">Community</label>
+          <select id="community" name="community">
+            <option value="SC">SC</option>
+            <option value="ST">ST</option>
+            <option value="OBC">OBC</option>
+            <option value="General">General</option>
+          </select>
+        </div>
+        <div>
+          <label for="annual_income">Annual family income (&#8377;)</label>
+          <input id="annual_income" name="annual_income" type="number" min="0" step="1" value="120000">
+        </div>
+      </div>
+      <div class="grid">
+        <div>
+          <label for="moratorium_mode">Moratorium interest mode</label>
+          <select id="moratorium_mode" name="moratorium_mode">
+            <option value="SERVICED">Serviced (pay interest during moratorium)</option>
+            <option value="CAPITALISED">Capitalised (interest added to principal)</option>
+            <option value="WAIVED">Waived (no interest during moratorium)</option>
+          </select>
+        </div>
+        <div>
+          <label for="is_defaulter">Existing loan default on record?</label>
+          <select id="is_defaulter" name="is_defaulter">
+            <option value="false">No</option>
+            <option value="true">Yes</option>
+          </select>
+        </div>
+      </div>
+    </details>
+
+    <button type="submit" id="submitBtn">Get Assessment</button>
+    <div id="formError"></div>
+  </form>
+
+  <div id="loading" class="loading" style="display:none;">Running feasibility &amp; financial structuring&hellip;</div>
+
+  <div id="results">
+    <div class="card" id="eligibilityCard"></div>
+    <div class="card" id="module2aCard"></div>
+    <div class="card" id="module1Card"></div>
+    <div class="card" id="module2bCard"></div>
+    <div class="card">
+      <h2>Calculation trace</h2>
+      <table class="trace" id="traceTable"><thead>
+        <tr><th>Step</th><th>Inputs</th><th>Formula</th><th>Output</th><th>Sources</th></tr>
+      </thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script>
+const inr = (v) => "₹" + Number(v).toLocaleString("en-IN", {maximumFractionDigits: 2});
+
+document.getElementById("assessForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const btn = document.getElementById("submitBtn");
+  const errBox = document.getElementById("formError");
+  errBox.innerHTML = "";
+  document.getElementById("results").style.display = "none";
+  document.getElementById("loading").style.display = "block";
+  btn.disabled = true;
+
+  const fd = new FormData(form);
+  try {
+    const res = await fetch("/assess", { method: "POST", body: fd });
+    const data = await res.json();
+    document.getElementById("loading").style.display = "none";
+    btn.disabled = false;
+    if (!res.ok) {
+      errBox.innerHTML = `<div class="error">${data.error}</div>`;
+      return;
+    }
+    renderResults(data);
+  } catch (err) {
+    document.getElementById("loading").style.display = "none";
+    btn.disabled = false;
+    errBox.innerHTML = `<div class="error">Request failed: ${err}</div>`;
+  }
+});
+
+function renderResults(r) {
+  document.getElementById("results").style.display = "block";
+
+  // Eligibility
+  const elig = r.eligibility;
+  let elHtml = `<h2>Location &amp; eligibility</h2><div class="kv">
+    <div>Resolved location</div><div>${r.location.village}, ${r.location.block}, ${r.location.district}, ${r.location.state}</div>
+    <div>Data source</div><div>${r.location.data_source}</div>
+    <div>Eligibility</div><div>${elig.passed
+      ? '<span class="badge good">PASSED</span>'
+      : '<span class="badge bad">NOT MET</span>'}</div>
+  </div>`;
+  if (!elig.passed) {
+    elHtml += `<p class="note">${elig.reasons.join(" ")}</p>
+    <p class="note">Applicant cannot proceed under this scheme &mdash; no financial or feasibility figures computed.</p>`;
+  }
+  document.getElementById("eligibilityCard").innerHTML = elHtml;
+  document.getElementById("module2aCard").style.display = elig.passed ? "block" : "none";
+  document.getElementById("module1Card").style.display = elig.passed ? "block" : "none";
+  document.getElementById("module2bCard").style.display = elig.passed ? "block" : "none";
+  if (!elig.passed) { renderTrace(r.trace); return; }
+
+  // Module 2 (part 1) — Financial Structuring
+  const fs = r.financial_structuring;
+  const sc = fs.scheme;
+  document.getElementById("module2aCard").innerHTML = `
+    <h2>Module 2 &mdash; Financial Structuring</h2>
+    <div class="kv">
+      <div>Naive max project cost (margin &divide; 10%)</div><div>${inr(fs.naive_max_project_cost)}</div>
+      <div>Affordable max project cost (cap-aware)</div><div>${inr(fs.affordable_max_project_cost)}</div>
+      <div>Operational project cost (capex + working capital)</div><div>${inr(fs.operational_project_cost)}</div>
+      <div><b>Recommended project cost</b></div><div><b>${inr(fs.recommended_project_cost)}</b></div>
+      <div>Capex</div><div>${inr(fs.capex)}</div>
+      <div>Working capital</div><div>${inr(fs.working_capital)}</div>
+      <div>Scheme tier</div><div>${sc.scheme_key}</div>
+      <div>Loan amount</div><div>${inr(sc.loan_amount)}</div>
+      <div>Margin required</div><div>${inr(sc.margin_required)}</div>
+      <div>Effective loan share</div><div>${sc.effective_loan_share_pct}% ${sc.cap_bound ? "(cap-bound)" : ""}</div>
+      <div>Interest rate</div><div>${sc.interest_rate_pct}% p.a.</div>
+      <div>Tenure</div><div>${sc.tenure_months} months (moratorium ${sc.moratorium_months} months)</div>
+    </div>
+    <p class="note">${fs.note}</p>
+  `;
+
+  // Module 1 — Feasibility
+  const fe = r.feasibility;
+  const rev = fe.estimated_monthly_revenue;
+  const swotHtml = fe.swot.map(b => `<li><b>${b.dimension}</b> &mdash; ${b.description}</li>`).join("");
+  document.getElementById("module1Card").innerHTML = `
+    <h2>Module 1 &mdash; Feasibility</h2>
+    <div class="kv">
+      <div>Catchment population (5km)</div><div>${fe.catchment_population_5km.toLocaleString("en-IN")}</div>
+      <div>Catchment population (10km)</div><div>${fe.catchment_population_10km.toLocaleString("en-IN")}</div>
+      <div>Competitor count</div><div>${fe.competitor_count} (nearest ${fe.nearest_competitor_km}km)</div>
+      <div>Demand gap</div><div>${fe.demand_gap_pct}%</div>
+      <div>Opportunity class</div><div>${fe.opportunity_class}</div>
+      <div>Local modal price</div><div>${inr(fe.price_modal_inr)}</div>
+      <div>Estimated monthly revenue</div><div>${inr(rev.value)} [${inr(rev.low)} &ndash; ${inr(rev.high)}]</div>
+      <div>Risk factors</div><div>${fe.risk.key_risk_factors.join(", ")}</div>
+      <div>Risk severity</div><div>${fe.risk.risk_severity_score} / 10</div>
+    </div>
+    <h3>SWOT</h3>
+    <ul class="swot">${swotHtml}</ul>
+  `;
+
+  // Module 2 (part 2) — Repayment & Viability
+  const rv = r.repayment_viability;
+  const verdictClass = rv.repayable_count >= 8 ? "good" : rv.repayable_count >= 5 ? "warn" : "bad";
+  document.getElementById("module2bCard").innerHTML = `
+    <h2>Module 2 &mdash; Repayment &amp; Viability</h2>
+    <div class="kv">
+      <div>Moratorium mode</div><div>${rv.moratorium_mode}</div>
+      <div>Quarterly installment (post-moratorium)</div><div>${inr(rv.quarterly_installment)}</div>
+      <div>Monthly operating cost</div><div>${inr(rv.monthly_opex)}</div>
+      <div>Schedule length</div><div>${rv.schedule_length} quarters</div>
+      <div>Total repayment (principal + interest)</div><div>${inr(rv.total_repayment)}</div>
+      <div>Verdict</div><div><span class="badge ${verdictClass}">${rv.verdict}</span></div>
+    </div>
+    <p class="note">Verdict is a scenario count across the revenue's own uncertainty band (&plusmn;40%) and an independent cost band (&plusmn;25%) &mdash; not a single colour.</p>
+  `;
+
+  renderTrace(r.trace);
+}
+
+function renderTrace(trace) {
+  const tbody = document.querySelector("#traceTable tbody");
+  tbody.innerHTML = trace.map(t => `<tr>
+    <td>${t.step}</td>
+    <td>${JSON.stringify(t.inputs)}</td>
+    <td>${t.formula}</td>
+    <td>${JSON.stringify(t.output)}</td>
+    <td>${t.sources.join(", ")}</td>
+  </tr>`).join("");
+}
+</script>
+</body>
+</html>

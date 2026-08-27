@@ -1,0 +1,7 @@
+# Stage 1 scaffold — pin versions once modules are implemented.
+# Financial engine: pure Python + decimal, no numpy for money (R4).
+pytest>=8.0
+pyyaml>=6.0
+fastapi>=0.110
+uvicorn>=0.29
+psycopg2-binary>=2.9   # PostgreSQL driver — db/connection.py
