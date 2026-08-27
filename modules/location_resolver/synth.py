@@ -12,6 +12,18 @@ is written to the DB once and reused on every later call).
 AUTO_DATA_SOURCE is the tag every auto-generated row carries so a judge
 question ("where did that number come from?") gets an honest answer, never
 a silently-invented one dressed up as EC 2013 / Census / HCES.
+
+IMPORTANT CHANGE: this module used to guarantee "any input, never an
+error" by dropping a deterministic-but-fake coordinate somewhere inside
+India's bounding box for text that matched nothing at all -- so "Ohio", or
+a typo, would silently get a real-looking catchment/competitor analysis
+computed against a made-up location. That guarantee is gone on purpose:
+resolve_candidate() now returns None (instead of fabricating a pin) when
+nothing in the locality/city/state gazetteer matches, and
+ensure_location_exists() raises LocationNotRecognized (carrying "did you
+mean" suggestions) instead of inserting a fake row. The
+locality -> city -> state-capital gazetteer tiers are unchanged and still
+resolve real, known places without error.
 """
 
 import hashlib
@@ -22,6 +34,12 @@ from db.connection import get_cursor
 from modules.location_resolver.gazetteer import INDIAN_STATES, LOCALITY_TO_CITY, MAJOR_CITIES
 
 AUTO_DATA_SOURCE = "auto_generated_synthetic_no_ground_truth (unrecognized location, illustrative estimate)"
+# Sentinel written by the OLD fake-pin fallback (removed below). A villages row
+# with this exact state, already sitting in the DB from before this fix, must
+# NOT be returned as a valid resolution any more -- otherwise the idempotency
+# cache in ensure_location_exists() would keep handing back a previously-
+# fabricated "Ohio" (etc.) forever, even after this code change.
+_STALE_UNRECOGNIZED_STATE = "Unrecognized (auto-placed, not geocoded)"
 CATEGORIES = ["Dairy", "Retail", "Textiles"]
 PRODUCT_BY_CATEGORY = {
     "Dairy": ("milk", 32.5), "Retail": ("grocery_staples_basket", 150.0), "Textiles": ("stitched_garment", 400.0),
@@ -47,11 +65,57 @@ def _location_id_for(query: str) -> str:
     return f"auto_{digest}"
 
 
-def resolve_candidate(query: str) -> dict:
-    """Chains locality -> city -> state gazetteer lookups; falls back to
-    treating the raw query as a new, otherwise-unplaced district. Never
-    raises — this is the function that guarantees 'any state, any locality,
-    no error'."""
+class LocationNotRecognized(Exception):
+    """Raised when free-text location input doesn't match the curated
+    dataset AND doesn't resolve via the locality/city/state gazetteer chain
+    either -- e.g. a real place outside India ("Ohio"), or a typo/nonsense
+    string. Carries `suggestions`: a short list of the closest real places
+    this tool actually knows about, so the caller can show "did you mean"
+    text instead of a bare error."""
+
+    def __init__(self, query: str, suggestions: list[str]):
+        self.query = query
+        self.suggestions = suggestions
+        super().__init__(
+            f"'{query}' isn't a location this tool recognizes. It doesn't match the curated "
+            f"dataset, a known Indian city/locality, or an Indian state name."
+        )
+
+
+def _suggest_locations(query: str, limit: int = 5) -> list[str]:
+    """Best-effort 'did you mean' suggestions for a query that matched
+    nothing at all -- fuzzy-matches the raw text against both the village
+    AND district names in the curated dataset (resolve_location()'s own
+    fuzzy step only checks village names), so a mistyped district still
+    surfaces something plausible. Low-similarity noise is filtered out
+    rather than shown as a confident-looking suggestion."""
+    q = query.strip()
+    if not q:
+        return []
+    with get_cursor() as cur:
+        cur.execute(
+            """
+            SELECT village, district, state,
+                   GREATEST(similarity(village, %s), similarity(district, %s)) AS score
+            FROM villages
+            ORDER BY score DESC
+            LIMIT %s
+            """,
+            (q, q, limit),
+        )
+        rows = cur.fetchall()
+    return [
+        f"{r['village']}, {r['district']}, {r['state']}"
+        for r in rows
+        if r["score"] and r["score"] > 0.15
+    ]
+
+
+def resolve_candidate(query: str) -> "dict | None":
+    """Chains locality -> city -> state gazetteer lookups. Returns None
+    (instead of fabricating a coordinate) when nothing matches at all --
+    the caller (ensure_location_exists) turns that into a clear
+    LocationNotRecognized error with suggestions."""
     q = " ".join(query.strip().lower().split())
 
     if q in LOCALITY_TO_CITY:
@@ -71,16 +135,8 @@ def resolve_candidate(query: str) -> dict:
                     state=query.strip().title(), region=query.strip().title(), lat=lat, lon=lon,
                     tier="urban", resolution="gazetteer_state_capital")
 
-    # Final catch-all: nothing recognized at all. Deterministically place it
-    # somewhere within India's bounding box, seeded by the query text, and
-    # say so plainly rather than guessing a real place.
-    rng = random.Random(f"unresolved_{q}")
-    lat = round(rng.uniform(8.0, 34.0), 4)
-    lon = round(rng.uniform(69.0, 96.0), 4)
-    return dict(village=query.strip().title(), block=f"{query.strip().title()} (auto)",
-                district=query.strip().title(), state="Unrecognized (auto-placed, not geocoded)",
-                region="Unrecognized (auto-placed, not geocoded)", lat=lat, lon=lon,
-                tier="rural-other", resolution="unresolved_freeform")
+    # Nothing recognized at all -- no fake pin. Caller raises instead.
+    return None
 
 
 def ensure_location_exists(query: str) -> dict:
@@ -95,9 +151,17 @@ def ensure_location_exists(query: str) -> dict:
         cur.execute("SELECT * FROM villages WHERE location_id = %s", (location_id,))
         existing = cur.fetchone()
     if existing:
-        return dict(existing)
+        existing = dict(existing)
+        if existing.get("state") == _STALE_UNRECOGNIZED_STATE:
+            # Synthesized under the old fake-pin fallback before this fix --
+            # do not keep serving that fabricated row. Fall through to the
+            # same "not recognized" error a fresh query would get.
+            raise LocationNotRecognized(query, _suggest_locations(query))
+        return existing
 
     candidate = resolve_candidate(query)
+    if candidate is None:
+        raise LocationNotRecognized(query, _suggest_locations(query))
     tier = candidate["tier"]
     rng = random.Random(location_id)
 

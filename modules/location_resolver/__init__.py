@@ -25,7 +25,7 @@ local DB lookup or local deterministic generation.
 """
 
 from db.connection import get_cursor
-from modules.location_resolver.synth import ensure_location_exists
+from modules.location_resolver.synth import LocationNotRecognized, ensure_location_exists
 
 
 class LocationNotFound(Exception):

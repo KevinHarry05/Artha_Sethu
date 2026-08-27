@@ -2,7 +2,13 @@
 
 import pytest
 
-from modules.location_resolver import LocationAmbiguous, LocationNotFound, get_population, resolve_location
+from modules.location_resolver import (
+    LocationAmbiguous,
+    LocationNotFound,
+    LocationNotRecognized,
+    get_population,
+    resolve_location,
+)
 from modules.pre_screening_gate import check_eligibility
 
 
@@ -18,12 +24,23 @@ def test_resolve_by_location_id():
     assert loc["village"] == "Chengalpattu Town (HQ)"
 
 
-def test_resolve_unknown_falls_back_to_auto_synthesis():
-    # Per the "any state, no error" requirement: an unrecognized place no
-    # longer raises — it resolves via gazetteer/synth.py's catch-all.
-    loc = resolve_location("Nonexistent Place Xyz123")
-    assert loc["location_id"].startswith("auto_")
-    assert "auto_generated" in loc["data_source"]
+def test_resolve_unrecognized_place_raises_with_suggestions():
+    # Updated per product decision: a place that matches nothing in the
+    # curated dataset AND nothing in the locality/city/state gazetteer no
+    # longer gets a fabricated coordinate (that used to silently place
+    # "Ohio" or a typo inside India and feed a real-looking catchment
+    # calculation). It now raises LocationNotRecognized, carrying
+    # best-effort "did you mean" suggestions instead.
+    with pytest.raises(LocationNotRecognized) as exc_info:
+        resolve_location("Nonexistent Place Xyz123")
+    assert isinstance(exc_info.value.suggestions, list)
+
+
+def test_resolve_real_place_outside_india_raises_not_fabricates():
+    # The concrete case that motivated the change: a real place that just
+    # isn't in India shouldn't get a real-looking Indian coordinate.
+    with pytest.raises(LocationNotRecognized):
+        resolve_location("Ohio")
 
 
 def test_resolve_only_raises_on_empty_query():

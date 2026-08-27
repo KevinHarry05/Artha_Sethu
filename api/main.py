@@ -25,6 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from api.auth_routes import router as auth_router
+from modules.location_resolver import LocationNotRecognized
 from pipeline import run_pipeline
 
 app = FastAPI(title="ARTHA SETU")
@@ -88,7 +89,15 @@ def assess(
             community=community, annual_family_income_inr=Decimal(str(annual_income)),
             is_defaulter=is_defaulter, moratorium_mode=moratorium_mode,
         )
-    except Exception as e:  # pipeline exceptions surface as a clean 400, not a stack trace
+    except LocationNotRecognized as e:
+        # Not just a stringified exception -- a shape the frontend can render as
+        # "did you mean" text, since a bare error string gives the user nothing
+        # actionable beyond "try again".
+        return JSONResponse(
+            status_code=400,
+            content={"error": str(e), "suggestions": e.suggestions, "error_type": "location_not_recognized"},
+        )
+    except Exception as e:  # other pipeline exceptions surface as a clean 400, not a stack trace
         return JSONResponse(status_code=400, content={"error": f"{type(e).__name__}: {e}"})
 
     trace = [
