@@ -1,31 +1,41 @@
 """
 [0] LOCATION RESOLVER
 
-Input:  village / block / district / city / state text (typed or, later,
-        spoken) — anywhere in India, not just the curated dataset.
+Input:  a 6-digit PIN code.
 Output: canonical location record — LGD code, block, district, region,
         coordinates.
 
-Matching strategy, in order:
-  1. Curated dataset: exact match, then location_id/lgd_code, then trigram
-     fuzzy match (pg_trgm) — the 200-location Tamil Nadu dataset loaded by
-     db/ingest_raw_data.py. Real district names, synthetic sub-district
-     detail (see docs/DATA_DECISIONS.md).
-  2. Gazetteer + auto-synthesis fallback (modules/location_resolver/synth.py):
-     any locality/city/state anywhere in India that isn't in the curated
-     dataset resolves via the offline gazetteer, and a full synthetic data
-     footprint (population, competitors, market prices) is generated for it
-     on demand — deterministically and idempotently — so the pipeline never
-     errors out on an unrecognized place. Every such row is tagged
-     'auto_generated_synthetic_no_ground_truth' so this is never mistaken
-     for real Census/EC data.
+CHANGED (deliberately, for now): this used to accept free-text village /
+locality / city / state input, matched via exact text match, then trigram
+fuzzy match, then an offline gazetteer + auto-synthesis fallback for
+anything outside the curated dataset (see synth.py's docstring for why
+that auto-synthesis fallback itself was later tightened to raise instead
+of fabricating a coordinate). That entire free-text path is now bypassed:
+resolve_location() takes a PIN code and matches it exactly against the
+`pincode` column loaded from 01_locations.csv (see db/ingest_raw_data.py).
+
+Why: PIN codes are unambiguous where place names aren't — no typos to
+fuzzy-match, no "which Chengalpattu did you mean", no risk of a
+free-text guess landing on a real place with the same name outside India.
+The tradeoff is scope: only the curated 200-location Tamil Nadu dataset is
+covered right now, not "any state, any locality" the way the old gazetteer
+fallback advertised. modules/location_resolver/synth.py and gazetteer.py
+are left in place, unused by this function, in case free-text input needs
+to come back later (e.g. layered on top of an all-India PIN code
+directory) -- LocationNotRecognized is reused from there since its
+(query, suggestions) shape already fits.
+
+Downstream code is unaffected: this function still returns the same dict
+shape (location_id, lgd_code, pincode, village, block, district, region,
+state, latitude, longitude, urban_rural_flag) it always did, so
+pipeline.py, feasibility_engine, etc. don't need to change.
 
 No external geocoding call in the request path (R1) — everything here is a
-local DB lookup or local deterministic generation.
+local DB lookup.
 """
 
 from db.connection import get_cursor
-from modules.location_resolver.synth import LocationNotRecognized, ensure_location_exists
+from modules.location_resolver.synth import LocationNotRecognized
 
 
 class LocationNotFound(Exception):
@@ -41,36 +51,43 @@ class LocationAmbiguous(Exception):
         super().__init__(f"{len(candidates)} candidate locations matched")
 
 
-def resolve_location(place_query: str, district_hint: str | None = None) -> dict:
-    """Resolve free-text location input to a canonical location record.
+def _suggest_pincodes(limit: int = 5) -> list[str]:
+    """A small sample of PIN codes this tool actually has data for, shown
+    as 'did you mean' style suggestions when a code isn't found or isn't
+    correctly formatted."""
+    with get_cursor() as cur:
+        cur.execute(
+            "SELECT pincode, village, district FROM villages ORDER BY pincode LIMIT %s",
+            (limit,),
+        )
+        rows = cur.fetchall()
+    return [f"{r['pincode']} — {r['village']}, {r['district']}" for r in rows]
 
-    Returns a dict with location_id, lgd_code, village, block, district,
-    region, state, latitude, longitude, urban_rural_flag.
+
+def resolve_location(pincode: str) -> dict:
+    """Resolve a 6-digit PIN code to a canonical location record.
+
+    Returns a dict with location_id, lgd_code, pincode, village, block,
+    district, region, state, latitude, longitude, urban_rural_flag.
     """
-    query = place_query.strip()
+    query = (pincode or "").strip()
     if not query:
-        raise LocationNotFound("Empty location query")
+        raise LocationNotFound("Empty pincode")
+
+    is_well_formed = query.isdigit() and len(query) == 6
 
     with get_cursor() as cur:
-        # 1. Exact (case-insensitive) match on village name, optionally
-        #    narrowed by district when the caller already knows it.
-        if district_hint:
-            cur.execute(
-                """
-                SELECT * FROM villages
-                WHERE lower(village) = lower(%s) AND lower(district) = lower(%s)
-                """,
-                (query, district_hint),
-            )
-        else:
-            cur.execute("SELECT * FROM villages WHERE lower(village) = lower(%s)", (query,))
-        rows = cur.fetchall()
-        if len(rows) == 1:
-            return dict(rows[0])
-        if len(rows) > 1:
-            raise LocationAmbiguous([dict(r) for r in rows])
+        if is_well_formed:
+            # 1. Exact PIN code match -- the only lookup path for
+            #    user-typed input now (see module docstring).
+            cur.execute("SELECT * FROM villages WHERE pincode = %s", (query,))
+            row = cur.fetchone()
+            if row:
+                return dict(row)
 
-        # 2. Exact match on location_id or lgd_code (structured input).
+        # 2. Exact match on location_id or lgd_code -- unchanged, for
+        #    internal/structured callers (tests, admin tools) that already
+        #    have the canonical id rather than a PIN code.
         cur.execute(
             "SELECT * FROM villages WHERE location_id = %s OR lgd_code = %s",
             (query, query),
@@ -79,28 +96,12 @@ def resolve_location(place_query: str, district_hint: str | None = None) -> dict
         if row:
             return dict(row)
 
-        # 3. Fuzzy fallback — trigram similarity on village name.
-        cur.execute(
-            """
-            SELECT *, similarity(village, %s) AS match_score
-            FROM villages
-            WHERE village %% %s
-            ORDER BY match_score DESC
-            LIMIT 5
-            """,
-            (query, query),
-        )
-        candidates = [dict(r) for r in cur.fetchall()]
-
-    if candidates and (len(candidates) == 1 or candidates[0]["match_score"] >= 0.6):
-        return candidates[0]
-    if len(candidates) > 1:
-        raise LocationAmbiguous(candidates)
-
-    # 4. Not in the curated dataset at all — gazetteer + auto-synthesis.
-    # This is what makes "Koramangala", "Bengaluru", or any other Indian
-    # state/district resolve without error (see synth.py's docstring).
-    return ensure_location_exists(query)
+    suggestions = _suggest_pincodes()
+    if is_well_formed:
+        reason = f"PIN code '{query}' isn't in the locations this tool currently covers."
+    else:
+        reason = f"'{query}' isn't a valid 6-digit PIN code."
+    raise LocationNotRecognized(query, suggestions, reason=reason)
 
 
 def get_population(location_id: str) -> dict:

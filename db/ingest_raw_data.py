@@ -26,12 +26,12 @@ def ingest_locations(conn, data_dir: Path) -> int:
         cur.execute(
             """
             INSERT INTO villages
-                (location_id, lgd_code, village, block, district, region, state,
+                (location_id, lgd_code, pincode, village, block, district, region, state,
                  latitude, longitude, urban_rural_flag, data_source, data_vintage_date)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """,
             (
-                r["location_id"], r["lgd_code"], r["village"], r["block"], r["district"],
+                r["location_id"], r["lgd_code"], r["pincode"], r["village"], r["block"], r["district"],
                 r["region"], r["state"], float(r["latitude"]), float(r["longitude"]),
                 r["urban_rural_flag"], r["data_source"], r["data_vintage_date"],
             ),

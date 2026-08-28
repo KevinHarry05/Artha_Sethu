@@ -3,7 +3,6 @@
 import pytest
 
 from modules.location_resolver import (
-    LocationAmbiguous,
     LocationNotFound,
     LocationNotRecognized,
     get_population,
@@ -12,81 +11,46 @@ from modules.location_resolver import (
 from modules.pre_screening_gate import check_eligibility
 
 
-def test_resolve_exact_village_name():
-    loc = resolve_location("Chengalpattu Town (HQ)")
+def test_resolve_exact_pincode():
+    # loc_CGP_01 was assigned pincode 600001 (01_locations.csv, row 1 --
+    # pincodes assigned sequentially starting at 600001).
+    loc = resolve_location("600001")
     assert loc["location_id"] == "loc_CGP_01"
     assert loc["district"] == "Chengalpattu"
     assert loc["lgd_code"] == "TN-CGP-001"
+    assert loc["pincode"] == "600001"
 
 
 def test_resolve_by_location_id():
+    # Internal/structured callers can still pass the canonical id directly.
     loc = resolve_location("loc_CGP_01")
     assert loc["village"] == "Chengalpattu Town (HQ)"
 
 
-def test_resolve_unrecognized_place_raises_with_suggestions():
-    # Updated per product decision: a place that matches nothing in the
-    # curated dataset AND nothing in the locality/city/state gazetteer no
-    # longer gets a fabricated coordinate (that used to silently place
-    # "Ohio" or a typo inside India and feed a real-looking catchment
-    # calculation). It now raises LocationNotRecognized, carrying
-    # best-effort "did you mean" suggestions instead.
+def test_resolve_unknown_pincode_raises_with_suggestions():
+    # A well-formed but uncovered PIN code raises LocationNotRecognized
+    # with a sample of PIN codes this tool actually has data for, rather
+    # than silently fabricating a location for it.
     with pytest.raises(LocationNotRecognized) as exc_info:
-        resolve_location("Nonexistent Place Xyz123")
+        resolve_location("999999")
     assert isinstance(exc_info.value.suggestions, list)
+    assert len(exc_info.value.suggestions) > 0
 
 
-def test_resolve_real_place_outside_india_raises_not_fabricates():
-    # The concrete case that motivated the change: a real place that just
-    # isn't in India shouldn't get a real-looking Indian coordinate.
-    with pytest.raises(LocationNotRecognized):
-        resolve_location("Ohio")
+def test_resolve_malformed_input_raises_not_found():
+    # Free-text place names are no longer accepted at all -- PIN code
+    # matching replaced that whole flow (see location_resolver/__init__.py
+    # module docstring). A non-numeric or wrong-length string raises the
+    # same LocationNotRecognized as an unknown PIN code, with a clear
+    # "not a valid 6-digit PIN code" message.
+    with pytest.raises(LocationNotRecognized) as exc_info:
+        resolve_location("Chengalpattu")
+    assert "6-digit" in str(exc_info.value)
 
 
-def test_resolve_only_raises_on_empty_query():
+def test_resolve_only_raises_location_not_found_on_empty_query():
     with pytest.raises(LocationNotFound):
         resolve_location("")
-
-
-def test_resolve_locality_koramangala_maps_to_bengaluru():
-    loc = resolve_location("Koramangala")
-    assert loc["district"] == "Bengaluru Urban"
-    assert loc["state"] == "Karnataka"
-    assert loc["urban_rural_flag"] == "urban"
-
-
-def test_resolve_city_bengaluru_alt_spelling():
-    loc1 = resolve_location("Bengaluru")
-    loc2 = resolve_location("bangalore")
-    assert loc1["district"] == loc2["district"] == "Bengaluru Urban"
-
-
-def test_resolve_bare_state_name_falls_back_to_capital():
-    loc = resolve_location("Rajasthan")
-    assert loc["state"] == "Rajasthan"
-    assert loc["district"] == "Jaipur"
-
-
-def test_resolve_auto_location_is_idempotent():
-    loc1 = resolve_location("Koramangala")
-    loc2 = resolve_location("Koramangala")
-    assert loc1["location_id"] == loc2["location_id"]
-
-
-def test_auto_resolved_location_has_working_population_and_competitors():
-    from modules.feasibility_engine import get_competitors
-
-    loc = resolve_location("Whitefield")
-    pop = get_population(loc["location_id"])
-    assert pop["population_2011"] > 0
-    comp = get_competitors(loc["location_id"], "Dairy")
-    assert comp.value >= 0
-
-
-def test_resolve_fuzzy_typo():
-    # one-character typo should still resolve via trigram similarity
-    loc = resolve_location("Chengalpattu Twon (HQ)")
-    assert loc["location_id"] == "loc_CGP_01"
 
 
 def test_get_population():

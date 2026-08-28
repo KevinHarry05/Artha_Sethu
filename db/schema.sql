@@ -7,6 +7,7 @@
 CREATE TABLE IF NOT EXISTS villages (
     location_id            TEXT PRIMARY KEY,          -- dataset's natural key, e.g. loc_CGP_01
     lgd_code                TEXT NOT NULL,
+    pincode                  TEXT NOT NULL UNIQUE,      -- 6-digit PIN code; the resolver's exact-match key
     village                 TEXT NOT NULL,
     block                   TEXT NOT NULL,
     district                TEXT NOT NULL,
@@ -19,6 +20,7 @@ CREATE TABLE IF NOT EXISTS villages (
     data_vintage_date         DATE NOT NULL
 );
 
+CREATE INDEX IF NOT EXISTS idx_villages_pincode ON villages (pincode);
 CREATE INDEX IF NOT EXISTS idx_villages_district ON villages (district);
 CREATE INDEX IF NOT EXISTS idx_villages_block ON villages (block);
 CREATE INDEX IF NOT EXISTS idx_villages_name_trgm ON villages USING gin (village gin_trgm_ops);

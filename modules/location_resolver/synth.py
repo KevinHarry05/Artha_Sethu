@@ -73,13 +73,14 @@ class LocationNotRecognized(Exception):
     this tool actually knows about, so the caller can show "did you mean"
     text instead of a bare error."""
 
-    def __init__(self, query: str, suggestions: list[str]):
+    def __init__(self, query: str, suggestions: list[str], reason: "str | None" = None):
         self.query = query
         self.suggestions = suggestions
-        super().__init__(
+        message = reason or (
             f"'{query}' isn't a location this tool recognizes. It doesn't match the curated "
             f"dataset, a known Indian city/locality, or an Indian state name."
         )
+        super().__init__(message)
 
 
 def _suggest_locations(query: str, limit: int = 5) -> list[str]:
